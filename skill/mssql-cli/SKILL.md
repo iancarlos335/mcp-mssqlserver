@@ -33,6 +33,8 @@ mssql-cli --host staging-sql.internal --database Orders describe-table Invoices
 
 Add `--pretty` to any command for indented JSON instead of compact JSON.
 
+**Query starting with `-`** (e.g. a query that opens with a `-- comment`, which is common in LLM-generated SQL): passing it as a plain argument is misread as an unknown option. Use the `--` separator to stop option parsing (`mssql-cli execute-query -- "-- comment\nSELECT 1"`), or pipe it via stdin instead (`echo "-- comment\nSELECT 1" | mssql-cli execute-query`) — both work today.
+
 ## Execution profiles (`execute-query` only)
 
 `execute-query` is gated by the `MSSQL_PROFILE` environment variable, cumulative:

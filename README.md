@@ -71,7 +71,7 @@ Two settings can be overridden per command with flags, without touching your exp
 | `--host <host>` | `MSSQL_HOST` | `mssql-cli --host staging-sql.internal list-tables` |
 | `--database <database>` | `MSSQL_DATABASE` | `mssql-cli --database Orders describe-table Invoices` |
 
-Both flags can be combined, and both are global — they must be passed before the subcommand:
+Both flags can be combined. They're global options, so commander accepts them either before or after the subcommand (`mssql-cli list-tables --host staging-sql.internal` works just as well as `mssql-cli --host staging-sql.internal list-tables`) — placing them before the subcommand is just a style preference:
 
 ```bash
 mssql-cli --host prod-sql.internal --database Orders describe-table Invoices
@@ -110,6 +110,16 @@ mssql-cli execute-query "SELECT TOP 10 * FROM Orders"
 mssql-cli analyze-query-plan "SELECT * FROM Orders WHERE CustomerId = 42" --include-raw-plan
 ```
 
+> **Query starting with `-`?** A query that begins with `-` (most commonly a `-- comment`) will be misread as an unknown option, e.g. `mssql-cli execute-query "-- comment\nSELECT 1"` fails with `unknown option`. Use the `--` separator to stop option parsing, or pipe the query via stdin instead:
+>
+> ```bash
+> mssql-cli execute-query -- "-- comment
+> SELECT 1"
+>
+> echo "-- comment
+> SELECT 1" | mssql-cli execute-query
+> ```
+
 ## Execution Profiles
 
 The `MSSQL_PROFILE` environment variable controls which SQL statements `execute-query` may run. Profiles are cumulative:
@@ -132,6 +142,8 @@ The catalog commands (`list-tables`, `describe-table`, `list-databases`, `get-ta
 ## Agent Skill installation
 
 This repo ships an agent-facing [Skill](skill/mssql-cli/SKILL.md) that teaches AI coding assistants how to use `mssql-cli` — the command table, execution-profile behavior, and workflow guidance (e.g. run `analyze-query-plan` before an expensive or unfamiliar `execute-query`). Installing it lets tools like Claude Code or Codex call `mssql-cli` correctly without you having to explain it in every conversation.
+
+> **Note:** The install scripts (`scripts/install-skill.sh` / `scripts/install-skill.ps1`) and the `skill/mssql-cli/` directory they copy from are not included when you `npm install -g` the package — that only installs the `mssql-cli` binary. To run the install scripts, either clone the repository (see [Install](#install) above), or download `scripts/install-skill.sh`/`scripts/install-skill.ps1` and `skill/mssql-cli/` directly from the repo and keep them in the same relative layout.
 
 The install scripts copy `skill/mssql-cli/` into whichever of these provider folders you target:
 
