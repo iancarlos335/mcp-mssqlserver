@@ -33,6 +33,14 @@ export function createDbConfig(authMode, overrides = {}) {
     const host = overrides.host ?? process.env.MSSQL_HOST ?? 'localhost';
     const port = parsePort(process.env.MSSQL_PORT ?? '1433');
     const database = overrides.database ?? requireEnv('MSSQL_DATABASE');
+    // Defense in depth: host/database can come from CLI overrides (--host /
+    // --database), which may be composed by an untrusted agent. Reject values
+    // that could inject keywords into the ODBC connection string built below
+    // for windows auth (e.g. `;TrustServerCertificate=yes` or `;UID=...`).
+    const forbiddenChars = /[;{}=]/;
+    if (forbiddenChars.test(host) || forbiddenChars.test(database)) {
+        throw new Error('Valor inválido para host/database: caracteres não permitidos (;{}=)');
+    }
     const config = {
         server: host,
         port,

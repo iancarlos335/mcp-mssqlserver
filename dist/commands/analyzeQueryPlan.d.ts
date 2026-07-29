@@ -1,4 +1,4 @@
-import { type AuthMode, type ConnectionOverrides } from '../db.js';
+import { type ConnectionOverrides } from '../db.js';
 export interface PlanOperator {
     physicalOp: string;
     logicalOp: string;
@@ -30,5 +30,5 @@ export interface AnalyzeQueryPlanResult {
     parseErrors?: string[];
     rawPlan?: string;
 }
-export declare function analyzeQueryPlan(authMode: AuthMode, overrides: ConnectionOverrides, query: string, includeRawPlan?: boolean): Promise<AnalyzeQueryPlanResult>;
+export declare function analyzeQueryPlan(overrides: ConnectionOverrides, query: string, includeRawPlan?: boolean): Promise<AnalyzeQueryPlanResult>;
 //# sourceMappingURL=analyzeQueryPlan.d.ts.map

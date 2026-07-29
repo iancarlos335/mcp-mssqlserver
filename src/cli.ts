@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command, CommanderError } from 'commander';
 import type sql from 'mssql';
-import { parseProfile } from './guard.js';
-import { getAuthMode, connect, type ConnectionOverrides } from './db.js';
+import { parseProfile, assertQueryAllowed } from './guard.js';
+import { connect, type ConnectionOverrides } from './db.js';
 import { listTables } from './commands/listTables.js';
 import { describeTable } from './commands/describeTable.js';
 import { listDatabases } from './commands/listDatabases.js';
@@ -17,9 +17,23 @@ const program = new Command();
 program
   .name('mssql-cli')
   .description('CLI for querying, inspecting, and analyzing Microsoft SQL Server databases')
+  .version('2.0.0')
   .option('--host <host>', 'override MSSQL_HOST for this invocation')
   .option('--database <database>', 'override MSSQL_DATABASE for this invocation')
   .option('--pretty', 'pretty-print JSON output', false);
+
+// Route commander's own parse/usage errors (unknown option, missing argument,
+// unknown command, etc.) through the same JSON error contract as command
+// actions, instead of letting commander print plain text and call
+// process.exit() directly. --help/--version still print normally (they exit
+// via CommanderError with exitCode 0, handled below).
+program.exitOverride();
+program.configureOutput({
+  writeErr: () => {
+    // Suppress commander's default plain-text error output; the thrown
+    // CommanderError is turned into JSON error output in main() below.
+  },
+});
 
 function overridesFromOpts(): ConnectionOverrides {
   const opts = program.opts();
@@ -50,13 +64,21 @@ async function withConnection<T>(
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) {
-    throw new Error('Nenhuma query informada. Passe como argumento ou via stdin.');
+    throw new Error('No query provided. Pass it as an argument or via stdin.');
   }
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks).toString('utf8').trim();
+}
+
+async function resolveQuery(queryArg: string | undefined): Promise<string> {
+  const query = queryArg ?? (await readStdin());
+  if (!query) {
+    throw new Error('No query provided. Pass it as an argument or via stdin.');
+  }
+  return query;
 }
 
 program
@@ -128,9 +150,13 @@ program
   .description('Execute a SQL statement, gated by MSSQL_PROFILE (reader/dml/ddl)')
   .action(async (queryArg) => {
     try {
-      const query = queryArg ?? (await readStdin());
+      const query = await resolveQuery(queryArg);
       const profile = parseProfile(process.env.MSSQL_PROFILE);
-      const result = await withConnection((pool) => executeQuery(pool, query, profile));
+      // Check the guard before connecting: a blocked query should fail fast
+      // without paying for a DB connection, and a connection error must
+      // never mask a clearer guard-rejection error.
+      assertQueryAllowed(query, profile);
+      const result = await withConnection((pool) => executeQuery(pool, query));
       printResult(result);
     } catch (error) {
       printError(error);
@@ -143,15 +169,31 @@ program
   .option('--include-raw-plan', 'include the raw SHOWPLAN_XML in the output', false)
   .action(async (queryArg, opts) => {
     try {
-      const query = queryArg ?? (await readStdin());
-      const authMode = getAuthMode();
-      const result = await analyzeQueryPlan(authMode, overridesFromOpts(), query, opts.includeRawPlan);
+      const query = await resolveQuery(queryArg);
+      const result = await analyzeQueryPlan(overridesFromOpts(), query, opts.includeRawPlan);
       printResult(result);
     } catch (error) {
       printError(error);
     }
   });
 
-program.parseAsync(process.argv).catch((error) => {
-  printError(error);
-});
+async function main(): Promise<void> {
+  try {
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    if (error instanceof CommanderError) {
+      // --help/--version (and other zero-exit-code paths) already printed
+      // their output via the default writeOut; nothing else to do.
+      if (error.exitCode === 0) {
+        process.exitCode = 0;
+        return;
+      }
+      printError(new Error(error.message.replace(/^error:\s*/, '')));
+      process.exitCode = error.exitCode;
+      return;
+    }
+    printError(error);
+  }
+}
+
+void main();

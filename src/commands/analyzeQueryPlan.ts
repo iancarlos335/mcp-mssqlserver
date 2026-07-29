@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { inspect } from 'node:util';
-import { connectDedicated, type AuthMode, type ConnectionOverrides } from '../db.js';
+import { connectDedicated, type ConnectionOverrides } from '../db.js';
 
 // ---------------------------------------------------------------------------
 // Análise de plano de execução (SHOWPLAN_XML)
@@ -277,7 +277,6 @@ function formatError(error: unknown): string {
 }
 
 async function getEstimatedPlanXml(
-  authMode: AuthMode,
   overrides: ConnectionOverrides,
   query: string
 ): Promise<string[]> {
@@ -311,12 +310,11 @@ export interface AnalyzeQueryPlanResult {
 }
 
 export async function analyzeQueryPlan(
-  authMode: AuthMode,
   overrides: ConnectionOverrides,
   query: string,
   includeRawPlan = false
 ): Promise<AnalyzeQueryPlanResult> {
-  const plans = await getEstimatedPlanXml(authMode, overrides, query);
+  const plans = await getEstimatedPlanXml(overrides, query);
   const statements: StatementAnalysis[] = [];
   const parseErrors: string[] = [];
   for (const xml of plans) {

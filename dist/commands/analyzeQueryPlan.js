@@ -228,7 +228,7 @@ function formatError(error) {
         return inspect(error, { depth: 6, breakLength: 120 });
     }
 }
-async function getEstimatedPlanXml(authMode, overrides, query) {
+async function getEstimatedPlanXml(overrides, query) {
     const { pool } = await connectDedicated(overrides);
     try {
         await pool.request().batch('SET SHOWPLAN_XML ON');
@@ -252,8 +252,8 @@ async function getEstimatedPlanXml(authMode, overrides, query) {
         await pool.close();
     }
 }
-export async function analyzeQueryPlan(authMode, overrides, query, includeRawPlan = false) {
-    const plans = await getEstimatedPlanXml(authMode, overrides, query);
+export async function analyzeQueryPlan(overrides, query, includeRawPlan = false) {
+    const plans = await getEstimatedPlanXml(overrides, query);
     const statements = [];
     const parseErrors = [];
     for (const xml of plans) {
