@@ -12,6 +12,12 @@ import {
 import sql from 'mssql';
 import { XMLParser } from 'fast-xml-parser';
 import { inspect } from 'node:util';
+import {
+  parseProfile,
+  assertQueryAllowed,
+  describeExecuteQueryTool,
+  type Profile,
+} from './guard.js';
 
 // ---------------------------------------------------------------------------
 // Configuração via variáveis de ambiente
@@ -88,6 +94,7 @@ function createDbConfig(authMode: AuthMode): sql.config {
 }
 
 const authMode = getAuthMode();
+const profile: Profile = parseProfile(process.env.MSSQL_PROFILE);
 let sqlClient: SqlClient | null = null;
 const dbConfig: sql.config = createDbConfig(authMode);
 
@@ -430,8 +437,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'execute_query',
-      description:
-        'Executa uma query SQL no SQL Server e retorna os resultados. Use para SELECT, INSERT, UPDATE e DELETE.',
+      description: describeExecuteQueryTool(profile),
       inputSchema: {
         type: 'object',
         properties: {
@@ -555,6 +561,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'execute_query': {
         const query = args?.query as string;
+        assertQueryAllowed(query, profile);
         const result = await pool.request().query(query);
         const output =
           result.recordset?.length > 0
