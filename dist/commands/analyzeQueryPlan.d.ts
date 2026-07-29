@@ -1,5 +1,5 @@
-#!/usr/bin/env node
-interface PlanOperator {
+import { type ConnectionOverrides } from '../db.js';
+export interface PlanOperator {
     physicalOp: string;
     logicalOp: string;
     estimatedRows?: number;
@@ -7,7 +7,7 @@ interface PlanOperator {
     object?: string;
     lookup?: boolean;
 }
-interface MissingIndexSuggestion {
+export interface MissingIndexSuggestion {
     impact?: number;
     table?: string;
     equalityColumns: string[];
@@ -15,7 +15,7 @@ interface MissingIndexSuggestion {
     includeColumns: string[];
     suggestedCreateStatement?: string;
 }
-interface StatementAnalysis {
+export interface StatementAnalysis {
     statementText: string;
     estimatedRows?: number;
     estimatedCost?: number;
@@ -25,5 +25,10 @@ interface StatementAnalysis {
     missingIndexes: MissingIndexSuggestion[];
 }
 export declare function parseShowplan(xml: string): StatementAnalysis[];
-export {};
-//# sourceMappingURL=index.d.ts.map
+export interface AnalyzeQueryPlanResult {
+    statements: StatementAnalysis[];
+    parseErrors?: string[];
+    rawPlan?: string;
+}
+export declare function analyzeQueryPlan(overrides: ConnectionOverrides, query: string, includeRawPlan?: boolean): Promise<AnalyzeQueryPlanResult>;
+//# sourceMappingURL=analyzeQueryPlan.d.ts.map

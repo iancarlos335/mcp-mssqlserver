@@ -1,0 +1,1 @@
+{"version":3,"file":"listDatabases.js","sourceRoot":"","sources":["../../src/commands/listDatabases.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,KAAK,UAAU,aAAa,CAAC,IAAwB;IAC1D,MAAM,MAAM,GAAG,MAAM,IAAI;SACtB,OAAO,EAAE;SACT,KAAK,CAAC,uEAAuE,CAAC,CAAC;IAClF,OAAO,MAAM,CAAC,SAAS,CAAC;AAC1B,CAAC"}

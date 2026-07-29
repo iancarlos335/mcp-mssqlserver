@@ -1,10 +1,8 @@
 # mcp-mssqlserver
 
-[![Docker Publish](https://github.com/ferronicardoso/mcp-mssqlserver/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ferronicardoso/mcp-mssqlserver/actions/workflows/docker-publish.yml)
-[![GHCR](https://img.shields.io/badge/ghcr.io-mcp--mssqlserver-2496ED?logo=docker&logoColor=white)](https://github.com/ferronicardoso/mcp-mssqlserver/pkgs/container/mcp-mssqlserver)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](package.json)
 
-Production-oriented MCP server for Microsoft SQL Server, exposing database operations to MCP clients (Claude Desktop, VS Code Copilot, Cursor, and compatible hosts).
+A command-line tool for Microsoft SQL Server: query execution, schema discovery, and execution-plan analysis, installable globally as `mssql-cli` — with a bundled Skill so coding agents (Claude Code, Codex, and others) can use it directly.
 
 ## Features
 
@@ -13,29 +11,42 @@ Production-oriented MCP server for Microsoft SQL Server, exposing database opera
 - Table metadata inspection (columns, types, nullability, defaults, PK)
 - Index and foreign key discovery
 - Estimated execution plan analysis (operators, costs, warnings, missing index suggestions) without executing the query
-- Environment-driven configuration for secure deployment
-
-## Available Tools
-
-| Tool | Description |
-|---|---|
-| `execute_query` | Executes a SQL statement and returns recordsets or affected rows (statements allowed depend on `MSSQL_PROFILE`) |
-| `list_tables` | Lists tables from `INFORMATION_SCHEMA.TABLES` (optional schema filter) |
-| `describe_table` | Returns table column metadata and primary key markers |
-| `list_databases` | Lists all SQL Server databases |
-| `get_table_indexes` | Lists table indexes, type, uniqueness, PK, and indexed columns |
-| `get_foreign_keys` | Lists table foreign keys and referenced targets |
-| `analyze_query_plan` | Returns the estimated execution plan analysis (operators, costs, warnings, missing indexes) without executing the query |
+- Environment-driven configuration, with per-invocation `--host`/`--database` overrides
+- A ready-to-install agent Skill (`skill/mssql-cli/`) so AI coding assistants can drive the CLI directly
 
 ## Requirements
 
 - Node.js 18+
 - Access to a Microsoft SQL Server instance
-- Network connectivity from MCP host to SQL Server (`host:port`)
+- Network connectivity from the machine running `mssql-cli` to SQL Server (`host:port`)
+
+## Install
+
+Install globally from GitHub:
+
+```bash
+npm install -g github:iancarlos335/mcp-mssqlserver
+```
+
+Or from a local clone:
+
+```bash
+git clone https://github.com/iancarlos335/mcp-mssqlserver
+cd mcp-mssqlserver
+npm install -g .
+```
+
+Either method builds the TypeScript sources and puts the `mssql-cli` binary on your `PATH`.
+
+Verify the install:
+
+```bash
+mssql-cli --help
+```
 
 ## Configuration
 
-Set connection settings using environment variables:
+`mssql-cli` reads connection settings from environment variables. Set them in your shell (or a `.env` file loaded by your shell/process manager) before running any command:
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -51,15 +62,67 @@ Set connection settings using environment variables:
 
 \* Required when `MSSQL_AUTH_MODE=sql`.
 
-| `MCP_TRANSPORT` | No | `stdio` | Transport mode: `stdio` (default, for `npx`/Claude Desktop/VS Code) or `http` (Streamable HTTP, for Docker/remote clients such as n8n) |
-| `MCP_HTTP_PORT` | No | `3001` | Port for the HTTP server (only used when `MCP_TRANSPORT=http`) |
-| `MCP_HTTP_HOST` | No | `0.0.0.0` | Bind address for the HTTP server (only used when `MCP_TRANSPORT=http`) |
+### Per-invocation overrides
 
-> Note: the published Docker image always runs in `http` mode and does not build the `msnodesqlv8` native driver (used only for `MSSQL_AUTH_MODE=windows`). Windows Authentication is only available when running the server directly on a Windows host via `npx`/`npm start`.
+Two settings can be overridden per command with flags, without touching your exported environment variables — handy for comparing databases or environments in the same shell session (especially with Windows Authentication, where switching `MSSQL_USER`/`MSSQL_PASSWORD` isn't relevant):
+
+| Flag | Overrides | Example |
+|---|---|---|
+| `--host <host>` | `MSSQL_HOST` | `mssql-cli --host staging-sql.internal list-tables` |
+| `--database <database>` | `MSSQL_DATABASE` | `mssql-cli --database Orders describe-table Invoices` |
+
+Both flags can be combined. They're global options, so commander accepts them either before or after the subcommand (`mssql-cli list-tables --host staging-sql.internal` works just as well as `mssql-cli --host staging-sql.internal list-tables`) — placing them before the subcommand is just a style preference:
+
+```bash
+mssql-cli --host prod-sql.internal --database Orders describe-table Invoices
+mssql-cli --host staging-sql.internal --database Orders describe-table Invoices
+```
+
+## Commands
+
+Every command prints JSON to stdout on success (exit code 0). On failure, it prints `{"error": "..."}` to stderr and exits with code 1. Add `--pretty` to any command for indented JSON instead of compact JSON.
+
+| Command | Description |
+|---|---|
+| `list-databases` | List all databases on the SQL Server instance |
+| `list-tables [--schema <schema>]` | List tables from `INFORMATION_SCHEMA.TABLES`, optionally filtered by schema |
+| `describe-table <table> [--schema <schema>]` | Column metadata and primary key markers for a table (default schema: `dbo`) |
+| `get-table-indexes <table> [--schema <schema>]` | Indexes, type, uniqueness, and indexed columns for a table (default schema: `dbo`) |
+| `get-foreign-keys <table> [--schema <schema>]` | Foreign keys and their referenced targets for a table (default schema: `dbo`) |
+| `execute-query <query>` | Execute a SQL statement and return rows or `{"rowsAffected": N}`, gated by `MSSQL_PROFILE` (see Execution Profiles below). The query can also be piped via stdin instead of passed as an argument. |
+| `analyze-query-plan <query> [--include-raw-plan]` | Return the *estimated* execution plan (operators, costs, warnings, missing-index suggestions) **without executing the query**. The query can also be piped via stdin. |
+
+### Examples
+
+```bash
+mssql-cli list-databases
+
+mssql-cli list-tables --schema dbo
+
+mssql-cli describe-table Orders --schema dbo
+
+mssql-cli get-table-indexes Orders
+
+mssql-cli get-foreign-keys Orders
+
+mssql-cli execute-query "SELECT TOP 10 * FROM Orders"
+
+mssql-cli analyze-query-plan "SELECT * FROM Orders WHERE CustomerId = 42" --include-raw-plan
+```
+
+> **Query starting with `-`?** A query that begins with `-` (most commonly a `-- comment`) will be misread as an unknown option, e.g. `mssql-cli execute-query "-- comment\nSELECT 1"` fails with `unknown option`. Use the `--` separator to stop option parsing, or pipe the query via stdin instead:
+>
+> ```bash
+> mssql-cli execute-query -- "-- comment
+> SELECT 1"
+>
+> echo "-- comment
+> SELECT 1" | mssql-cli execute-query
+> ```
 
 ## Execution Profiles
 
-The `MSSQL_PROFILE` environment variable controls which SQL statements `execute_query` may run. Profiles are cumulative:
+The `MSSQL_PROFILE` environment variable controls which SQL statements `execute-query` may run. Profiles are cumulative:
 
 | Profile | Allows |
 |---|---|
@@ -74,102 +137,61 @@ Enforcement uses a strict allowlist: statements the classifier does not recogniz
 - Transactions require `dml`.
 - Keywords inside strings, comments, or `[bracketed identifiers]` are ignored correctly.
 
-The catalog tools (`list_tables`, `describe_table`, `list_databases`, `get_table_indexes`, `get_foreign_keys`) run fixed read-only queries and work in every profile. The `execute_query` tool description shown to the MCP client reflects the active profile.
+The catalog commands (`list-tables`, `describe-table`, `list-databases`, `get-table-indexes`, `get-foreign-keys`) run fixed read-only queries and work in every profile, regardless of `MSSQL_PROFILE`.
 
-## Usage
+## Agent Skill installation
 
-### Run directly from GitHub
+This repo ships an agent-facing [Skill](skill/mssql-cli/SKILL.md) that teaches AI coding assistants how to use `mssql-cli` — the command table, execution-profile behavior, and workflow guidance (e.g. run `analyze-query-plan` before an expensive or unfamiliar `execute-query`). Installing it lets tools like Claude Code or Codex call `mssql-cli` correctly without you having to explain it in every conversation.
 
-```bash
-npx github:ferronicardoso/mcp-mssqlserver
-```
+> **Note:** The install scripts (`scripts/install-skill.sh` / `scripts/install-skill.ps1`) and the `skill/mssql-cli/` directory they copy from are not included when you `npm install -g` the package — that only installs the `mssql-cli` binary. To run the install scripts, either clone the repository (see [Install](#install) above), or download `scripts/install-skill.sh`/`scripts/install-skill.ps1` and `skill/mssql-cli/` directly from the repo and keep them in the same relative layout.
 
-### Claude Desktop configuration
+The install scripts copy `skill/mssql-cli/` into whichever of these provider folders you target:
 
-`%APPDATA%\\Claude\\claude_desktop_config.json`:
+| Target | Destination |
+|---|---|
+| `claude` | `~/.claude/skills/mssql-cli` |
+| `codex` | `$CODEX_HOME/skills/mssql-cli` (default `~/.codex/skills/mssql-cli`) |
+| `antigravity` | `~/.gemini/config/skills/mssql-cli` |
+| `agentskills` | `~/.agents/skills/mssql-cli` (the [agentskills.io](https://agentskills.io) convention) |
 
-```json
-{
-  "mcpServers": {
-    "mssqlserver": {
-      "command": "npx",
-      "args": ["github:ferronicardoso/mcp-mssqlserver"],
-      "env": {
-        "MSSQL_HOST": "localhost",
-        "MSSQL_PORT": "1433",
-        "MSSQL_DATABASE": "master",
-        "MSSQL_AUTH_MODE": "sql",
-        "MSSQL_USER": "sa",
-        "MSSQL_PASSWORD": "your-password",
-        "MSSQL_PROFILE": "reader"
-      }
-    }
-  }
-}
-```
-
-### VS Code MCP configuration
-
-`.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "mssqlserver": {
-      "command": "npx",
-      "args": ["github:ferronicardoso/mcp-mssqlserver"],
-      "env": {
-        "MSSQL_HOST": "localhost",
-        "MSSQL_PORT": "1433",
-        "MSSQL_DATABASE": "master",
-        "MSSQL_AUTH_MODE": "sql",
-        "MSSQL_USER": "sa",
-        "MSSQL_PASSWORD": "your-password",
-        "MSSQL_PROFILE": "reader"
-      }
-    }
-  }
-}
-```
-
-### Run with Docker (HTTP transport)
-
-The published image runs in Streamable HTTP mode by default, for use as a remote MCP endpoint (e.g. from n8n's MCP Client Tool node or any Streamable HTTP-compatible client):
+### macOS / Linux (`install-skill.sh`)
 
 ```bash
-docker run -d --name mcp-mssqlserver \
-  -p 3001:3001 \
-  -e MSSQL_HOST=host.docker.internal \
-  -e MSSQL_PORT=1433 \
-  -e MSSQL_DATABASE=master \
-  -e MSSQL_AUTH_MODE=sql \
-  -e MSSQL_USER=sa \
-  -e MSSQL_PASSWORD=your-password \
-  ghcr.io/ferronicardoso/mcp-mssqlserver:latest
+./scripts/install-skill.sh                    # installs to all 4 providers
+./scripts/install-skill.sh --target=claude     # installs to a single provider
+./scripts/install-skill.sh --uninstall         # removes from all 4 providers
+./scripts/install-skill.sh --target=claude --uninstall
 ```
 
-The MCP endpoint is then available at `http://localhost:3001/mcp`.
+### Windows (`install-skill.ps1`)
+
+```powershell
+.\scripts\install-skill.ps1                    # installs to all 4 providers
+.\scripts\install-skill.ps1 -Target claude      # installs to a single provider
+.\scripts\install-skill.ps1 -Uninstall          # removes from all 4 providers
+.\scripts\install-skill.ps1 -Target claude -Uninstall
+```
+
+`-Target` accepts `all` (default), `claude`, `codex`, `antigravity`, or `agentskills`.
 
 ## Local Development
 
 ```bash
-git clone https://github.com/ferronicardoso/mcp-mssqlserver
+git clone https://github.com/iancarlos335/mcp-mssqlserver
 cd mcp-mssqlserver
 npm install
 npm run build
 ```
 
-Start the compiled server:
+Run the CLI from the compiled output:
 
 ```bash
-npm start
+node dist/cli.js --help
 ```
 
 ## Build and Commit Workflow
 
-This repository intentionally tracks `dist/` to support `npx github:user/repo` usage.
-
-The project uses a Husky `pre-commit` hook to:
+This repository uses a Husky `pre-commit` hook to:
 1. build TypeScript (`npm run build`)
 2. stage generated artifacts (`git add dist`)
 
