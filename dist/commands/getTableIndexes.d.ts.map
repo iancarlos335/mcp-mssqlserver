@@ -1,0 +1,1 @@
+{"version":3,"file":"getTableIndexes.d.ts","sourceRoot":"","sources":["../../src/commands/getTableIndexes.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,GAAG,MAAM,OAAO,CAAC;AAE7B,wBAAsB,eAAe,CACnC,IAAI,EAAE,GAAG,CAAC,cAAc,EACxB,MAAM,EAAE,OAAO,GAAG,EAClB,KAAK,EAAE,MAAM,EACb,MAAM,SAAQ,GACb,OAAO,CAAC,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,EAAE,CAAC,CAqBpC"}
