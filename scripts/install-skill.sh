@@ -8,17 +8,19 @@ SKILL_NAME="mssql-cli"
 TARGET="all"
 UNINSTALL=0
 
-for arg in "$@"; do
-  case "$arg" in
-    --uninstall) UNINSTALL=1 ;;
-    --target=*) TARGET="${arg#--target=}" ;;
-    *)
-      echo "Unknown argument: $arg" >&2
-      echo "Usage: $0 [--target=claude|codex|antigravity|agentskills|all] [--uninstall]" >&2
-      exit 1
-      ;;
-  esac
-done
+if [ "$#" -gt 0 ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      --uninstall) UNINSTALL=1 ;;
+      --target=*) TARGET="${arg#--target=}" ;;
+      *)
+        echo "Unknown argument: $arg" >&2
+        echo "Usage: $0 [--target=claude|codex|antigravity|agentskills|all] [--uninstall]" >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
 
 CODEX_SKILLS_HOME="${CODEX_HOME:-$HOME/.codex}"
 
