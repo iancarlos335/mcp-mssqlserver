@@ -8,7 +8,7 @@ Production-oriented MCP server for Microsoft SQL Server, exposing database opera
 
 ## Features
 
-- Query execution (`SELECT`, `INSERT`, `UPDATE`, `DELETE`)
+- Query execution (`SELECT`, `INSERT`, `UPDATE`, `DELETE`), gated by execution profiles
 - Database discovery and schema introspection
 - Table metadata inspection (columns, types, nullability, defaults, PK)
 - Index and foreign key discovery
@@ -18,7 +18,7 @@ Production-oriented MCP server for Microsoft SQL Server, exposing database opera
 
 | Tool | Description |
 |---|---|
-| `execute_query` | Executes a SQL statement and returns recordsets or affected rows |
+| `execute_query` | Executes a SQL statement and returns recordsets or affected rows (statements allowed depend on `MSSQL_PROFILE`) |
 | `list_tables` | Lists tables from `INFORMATION_SCHEMA.TABLES` (optional schema filter) |
 | `describe_table` | Returns table column metadata and primary key markers |
 | `list_databases` | Lists all SQL Server databases |
@@ -41,6 +41,7 @@ Set connection settings using environment variables:
 | `MSSQL_PORT` | No | `1433` | SQL Server TCP port |
 | `MSSQL_DATABASE` | Yes | — | Default database |
 | `MSSQL_AUTH_MODE` | No | `sql` | Authentication mode: `sql` or `windows` |
+| `MSSQL_PROFILE` | No | `reader` | Execution guard profile: `reader` (read-only), `dml` (+ writes), `ddl` (everything) |
 | `MSSQL_USER` | Yes\* | — | SQL login user (required only in `sql`) |
 | `MSSQL_PASSWORD` | Yes\* | — | SQL login password (required only in `sql`) |
 | `MSSQL_ENCRYPT` | No | `false` | Enables encrypted connection |
@@ -53,6 +54,25 @@ Set connection settings using environment variables:
 | `MCP_HTTP_HOST` | No | `0.0.0.0` | Bind address for the HTTP server (only used when `MCP_TRANSPORT=http`) |
 
 > Note: the published Docker image always runs in `http` mode and does not build the `msnodesqlv8` native driver (used only for `MSSQL_AUTH_MODE=windows`). Windows Authentication is only available when running the server directly on a Windows host via `npx`/`npm start`.
+
+## Execution Profiles
+
+The `MSSQL_PROFILE` environment variable controls which SQL statements `execute_query` may run. Profiles are cumulative:
+
+| Profile | Allows |
+|---|---|
+| `reader` (default) | `SELECT`, CTEs, `DECLARE`/`SET`, flow control (`IF`, `WHILE`, `BEGIN...END`), cursors |
+| `dml` | Everything in `reader`, plus `INSERT`, `UPDATE`, `DELETE`, `MERGE` and transactions (`BEGIN TRAN`, `COMMIT`, `ROLLBACK`) |
+| `ddl` | Everything — `CREATE`/`ALTER`/`DROP`/`TRUNCATE`, `EXEC`, `GRANT`, and any other statement |
+
+Enforcement uses a strict allowlist: statements the classifier does not recognize are **denied** below `ddl`, with an error naming the active profile and the blocked statement. Notable classifications:
+
+- `SELECT ... INTO` requires `ddl` (it creates a table).
+- `EXEC`/`sp_executesql` and `OPENROWSET`/`OPENQUERY`/`OPENDATASOURCE` require `ddl` — dynamic and pass-through SQL cannot be classified.
+- Transactions require `dml`.
+- Keywords inside strings, comments, or `[bracketed identifiers]` are ignored correctly.
+
+The catalog tools (`list_tables`, `describe_table`, `list_databases`, `get_table_indexes`, `get_foreign_keys`) run fixed read-only queries and work in every profile. The `execute_query` tool description shown to the MCP client reflects the active profile.
 
 ## Usage
 
@@ -78,7 +98,8 @@ npx github:ferronicardoso/mcp-mssqlserver
         "MSSQL_DATABASE": "master",
         "MSSQL_AUTH_MODE": "sql",
         "MSSQL_USER": "sa",
-        "MSSQL_PASSWORD": "your-password"
+        "MSSQL_PASSWORD": "your-password",
+        "MSSQL_PROFILE": "reader"
       }
     }
   }
@@ -101,7 +122,8 @@ npx github:ferronicardoso/mcp-mssqlserver
         "MSSQL_DATABASE": "master",
         "MSSQL_AUTH_MODE": "sql",
         "MSSQL_USER": "sa",
-        "MSSQL_PASSWORD": "your-password"
+        "MSSQL_PASSWORD": "your-password",
+        "MSSQL_PROFILE": "reader"
       }
     }
   }
@@ -160,6 +182,7 @@ git add dist
 
 - Never commit real credentials or `.env` files.
 - Prefer least-privilege SQL users for production use.
+- Keep `MSSQL_PROFILE=reader` unless writes are required. The profile guard is defense-in-depth, not a substitute for database-level permissions.
 - For public or untrusted networks, enable encryption (`MSSQL_ENCRYPT=true`) and configure certificates appropriately.
 
 ## Windows Authentication (Integrated Security)
