@@ -2,4 +2,3 @@
 set -e
 
 node ./node_modules/typescript/bin/tsc
-git add dist

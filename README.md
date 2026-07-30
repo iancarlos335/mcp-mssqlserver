@@ -189,19 +189,6 @@ Run the CLI from the compiled output:
 node dist/cli.js --help
 ```
 
-## Build and Commit Workflow
-
-This repository uses a Husky `pre-commit` hook to:
-1. build TypeScript (`npm run build`)
-2. stage generated artifacts (`git add dist`)
-
-Manual fallback:
-
-```bash
-npm run build
-git add dist
-```
-
 ## Security Notes
 
 - Never commit real credentials or `.env` files.
