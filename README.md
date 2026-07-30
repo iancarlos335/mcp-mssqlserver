@@ -46,7 +46,7 @@ mssql-cli --help
 
 ## Configuration
 
-`mssql-cli` reads connection settings from environment variables. Set them in your shell (or a `.env` file loaded by your shell/process manager) before running any command:
+`mssql-cli` reads connection settings from environment variables. On startup it automatically loads a `.env` file from this repo's own root directory — regardless of the caller's current working directory, so a globally installed/linked `mssql-cli` always uses this repo's configuration. Values already present in the shell environment take precedence over `.env` values.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|

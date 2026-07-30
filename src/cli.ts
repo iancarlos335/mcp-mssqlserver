@@ -2,6 +2,7 @@
 
 import { Command, CommanderError } from 'commander';
 import type sql from 'mssql';
+import { loadRepoEnv } from './env.js';
 import { parseProfile, assertQueryAllowed } from './guard.js';
 import { connect, type ConnectionOverrides } from './db.js';
 import { listTables } from './commands/listTables.js';
@@ -11,6 +12,8 @@ import { getTableIndexes } from './commands/getTableIndexes.js';
 import { getForeignKeys } from './commands/getForeignKeys.js';
 import { executeQuery } from './commands/executeQuery.js';
 import { analyzeQueryPlan } from './commands/analyzeQueryPlan.js';
+
+loadRepoEnv();
 
 const program = new Command();
 
