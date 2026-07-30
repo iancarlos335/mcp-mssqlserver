@@ -1,1 +1,0 @@
-{"version":3,"file":"listDatabases.d.ts","sourceRoot":"","sources":["../../src/commands/listDatabases.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,GAAG,MAAM,OAAO,CAAC;AAE7B,wBAAsB,aAAa,CAAC,IAAI,EAAE,GAAG,CAAC,cAAc,GAAG,OAAO,CAAC,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,EAAE,CAAC,CAKhG"}

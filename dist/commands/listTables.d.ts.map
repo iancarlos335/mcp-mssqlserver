@@ -1,1 +1,0 @@
-{"version":3,"file":"listTables.d.ts","sourceRoot":"","sources":["../../src/commands/listTables.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,GAAG,MAAM,OAAO,CAAC;AAE7B,wBAAsB,UAAU,CAC9B,IAAI,EAAE,GAAG,CAAC,cAAc,EACxB,MAAM,EAAE,OAAO,GAAG,EAClB,MAAM,CAAC,EAAE,MAAM,GACd,OAAO,CAAC,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,EAAE,CAAC,CAapC"}
